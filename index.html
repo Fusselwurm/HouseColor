@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HouseColor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mdbassit/Coloris@latest/dist/coloris.min.css"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -45,7 +46,7 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: center;
-      gap: 8px 16px;
+      gap: 8px 12px;
       padding: 10px 16px;
       background: #111;
       border-top: 1px solid #2a2a2a;
@@ -66,46 +67,30 @@
       user-select: none;
     }
 
-    .swatch-group input[type="color"] {
-      width: 44px;
-      height: 36px;
-      border: 2px solid #3a3a3a;
-      border-radius: 5px 5px 0 0;
-      padding: 2px;
-      background: none;
-      cursor: pointer;
-      transition: border-color 0.15s;
-      display: block;
-    }
-
-    .swatch-group input[type="color"]:hover {
-      border-color: #666;
-    }
-
-    .hex-input {
-      width: 44px;
+    .color-input {
+      width: 72px;
+      height: 28px;
       background: #1e1e1e;
       border: 2px solid #3a3a3a;
-      border-top: none;
-      border-radius: 0 0 5px 5px;
-      color: #ccc;
-      font-size: 9px;
+      border-radius: 5px;
+      color: #ddd;
+      font-size: 11px;
       font-family: monospace;
       text-align: center;
-      padding: 2px 0;
+      padding: 0 4px 0 24px; /* room for the Coloris swatch on the left */
       outline: none;
-      cursor: text;
-      transition: border-color 0.15s, color 0.15s;
+      cursor: pointer;
+      transition: border-color 0.15s;
     }
 
-    .hex-input:focus {
+    .color-input:hover, .color-input:focus {
       border-color: #666;
       color: #fff;
     }
 
-    .hex-input.invalid {
-      color: #f87171;
-      border-color: #7f1d1d;
+    /* Coloris dark theme overrides */
+    #clr-picker {
+      --clr-color-area-height: 140px;
     }
 
     #copy-btn {
@@ -119,8 +104,7 @@
       font-weight: 600;
       white-space: nowrap;
       transition: background 0.15s;
-      align-self: flex-end;
-      margin-bottom: 2px;
+      align-self: center;
     }
 
     #copy-btn:hover { background: #1d4ed8; }
@@ -133,6 +117,7 @@
   </div>
   <div id="toolbar"></div>
 
+  <script src="https://cdn.jsdelivr.net/gh/mdbassit/Coloris@latest/dist/coloris.min.js"></script>
   <script>
     const PARAM_MAP = [
       { param: 'c1', hex: '2D2D2D', label: 'Glass#' },
@@ -145,11 +130,9 @@
       { param: 'c8', hex: 'FFFFFF', label: 'Facade2' },
     ];
 
-    // currentColors maps hex key → current 6-char uppercase hex
     const currentColors = {};
     PARAM_MAP.forEach(({ hex }) => { currentColors[hex] = hex; });
 
-    // groups maps hex key → array of SVG elements
     const groups = {};
     PARAM_MAP.forEach(({ hex }) => { groups[hex] = []; });
 
@@ -162,8 +145,7 @@
     }
 
     function applyColor(hexKey, newHex) {
-      // newHex is a 6-char string (no #), may be lowercase from input
-      const normalized = newHex.toUpperCase();
+      const normalized = newHex.replace('#', '').toUpperCase();
       currentColors[hexKey] = normalized;
       groups[hexKey].forEach(el => el.setAttribute('fill', '#' + normalized));
     }
@@ -183,11 +165,7 @@
         if (val && /^[0-9a-fA-F]{6}$/.test(val)) {
           applyColor(hex, val);
           const input = document.getElementById('input-' + i);
-          if (input) {
-            input.value = '#' + val.toLowerCase();
-            const hexSibling = input.nextElementSibling;
-            if (hexSibling) hexSibling.value = input.value;
-          }
+          if (input) input.value = '#' + val.toLowerCase();
         }
       });
     }
@@ -206,51 +184,20 @@
         lbl.htmlFor = 'input-' + i;
 
         const inp = document.createElement('input');
-        inp.type = 'color';
+        inp.type = 'text';
         inp.id = 'input-' + i;
+        inp.className = 'color-input';
         inp.value = '#' + currentColors[hex].toLowerCase();
+        inp.setAttribute('data-coloris', '');
 
-        const hexInp = document.createElement('input');
-        hexInp.type = 'text';
-        hexInp.className = 'hex-input';
-        hexInp.maxLength = 7;
-        hexInp.value = inp.value;
-        hexInp.spellcheck = false;
-
+        // Coloris fires a native 'input' event on the element when color changes
         inp.addEventListener('input', () => {
-          const val = inp.value.replace('#', '');
-          applyColor(hex, val);
-          hexInp.value = inp.value;
-          hexInp.classList.remove('invalid');
+          applyColor(hex, inp.value);
           history.replaceState(null, '', buildURL());
-        });
-
-        hexInp.addEventListener('input', () => {
-          let raw = hexInp.value.replace(/[^0-9a-fA-F#]/g, '');
-          if (!raw.startsWith('#')) raw = '#' + raw.replace('#', '');
-          hexInp.value = raw;
-          const stripped = raw.replace('#', '');
-          if (/^[0-9a-fA-F]{6}$/.test(stripped)) {
-            hexInp.classList.remove('invalid');
-            inp.value = '#' + stripped.toLowerCase();
-            applyColor(hex, stripped);
-            history.replaceState(null, '', buildURL());
-          } else {
-            hexInp.classList.add('invalid');
-          }
-        });
-
-        hexInp.addEventListener('blur', () => {
-          // Reset to current valid color if input is left invalid
-          if (hexInp.classList.contains('invalid')) {
-            hexInp.value = '#' + currentColors[hex].toLowerCase();
-            hexInp.classList.remove('invalid');
-          }
         });
 
         group.appendChild(lbl);
         group.appendChild(inp);
-        group.appendChild(hexInp);
         toolbar.appendChild(group);
       });
 
@@ -268,6 +215,20 @@
         });
       });
       toolbar.appendChild(btn);
+
+      // Init Coloris after inputs are in the DOM
+      Coloris({
+        el: '.color-input',
+        theme: 'pill',
+        themeMode: 'dark',
+        format: 'hex',
+        swatches: [
+          '#2D2D2D','#4A4141','#88A6D0','#E3D5C7',
+          '#D9D9D9','#EADDD1','#835822','#FFFFFF',
+          '#e63946','#f4a261','#2a9d8f','#457b9d',
+          '#1d3557','#f1faee','#a8dadc','#264653',
+        ],
+      });
     }
 
     fetch('Asset.svg')
@@ -279,22 +240,16 @@
         const container = document.getElementById('svg-container');
         container.innerHTML = svgText;
 
-        const svg = container.querySelector('svg');
-        if (svg) {
-          svg.removeAttribute('width');
-          svg.removeAttribute('height');
-        }
-
-        // Remove the white backdrop rect (first child rect with fill="white")
-        // so colored shapes multiply against the photo, not against white.
         const svgEl = container.querySelector('svg');
         if (svgEl) {
+          svgEl.removeAttribute('width');
+          svgEl.removeAttribute('height');
+          // Remove the white backdrop rect so colored shapes multiply against the photo
           const firstRect = svgEl.querySelector('rect[fill="white"]');
           if (firstRect) firstRect.remove();
         }
 
-        // Wrap all colored shapes in a <g mix-blend-mode="multiply"> group
-        // so they blend against the photo layer beneath them.
+        // Wrap all colored shapes in a <g> with mix-blend-mode: multiply
         const coloredEls = [];
         container.querySelectorAll('path, rect').forEach(el => {
           const key = normHex(el.getAttribute('fill'));
@@ -307,7 +262,6 @@
         if (coloredEls.length && svgEl) {
           const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
           g.style.mixBlendMode = 'multiply';
-          // Insert group before the first colored element, then move all into it
           coloredEls[0].parentNode.insertBefore(g, coloredEls[0]);
           coloredEls.forEach(el => g.appendChild(el));
         }
