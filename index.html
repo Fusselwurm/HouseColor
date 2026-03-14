@@ -115,6 +115,7 @@
       { param: 'c5', hex: 'D9D9D9', label: 'Gutters' },
       { param: 'c6', hex: 'EADDD1', label: 'Facade' },
       { param: 'c7', hex: '835822', label: 'Roof' },
+      { param: 'c8', hex: 'FFFFFF', label: 'Frames' },
     ];
 
     // currentColors maps hex key → current 6-char uppercase hex
@@ -128,7 +129,8 @@
     function normHex(fill) {
       if (!fill) return null;
       const f = fill.trim();
-      if (f === 'none' || f === 'white' || f.startsWith('url(')) return null;
+      if (f === 'none' || f.startsWith('url(')) return null;
+      if (f === 'white') return 'FFFFFF';
       return f.replace('#', '').toUpperCase();
     }
 
