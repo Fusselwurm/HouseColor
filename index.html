@@ -216,14 +216,32 @@
           svg.removeAttribute('height');
         }
 
-        // Scan and group elements
+        // Remove the white backdrop rect (first child rect with fill="white")
+        // so colored shapes multiply against the photo, not against white.
+        const svgEl = container.querySelector('svg');
+        if (svgEl) {
+          const firstRect = svgEl.querySelector('rect[fill="white"]');
+          if (firstRect) firstRect.remove();
+        }
+
+        // Wrap all colored shapes in a <g mix-blend-mode="multiply"> group
+        // so they blend against the photo layer beneath them.
+        const coloredEls = [];
         container.querySelectorAll('path, rect').forEach(el => {
           const key = normHex(el.getAttribute('fill'));
           if (key && groups[key]) {
             groups[key].push(el);
-            el.style.mixBlendMode = 'multiply';
+            coloredEls.push(el);
           }
         });
+
+        if (coloredEls.length && svgEl) {
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.style.mixBlendMode = 'multiply';
+          // Insert group before the first colored element, then move all into it
+          coloredEls[0].parentNode.insertBefore(g, coloredEls[0]);
+          coloredEls.forEach(el => g.appendChild(el));
+        }
 
         buildToolbar();
         readURLParams();
