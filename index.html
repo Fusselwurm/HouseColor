@@ -67,18 +67,45 @@
     }
 
     .swatch-group input[type="color"] {
-      width: 40px;
-      height: 30px;
+      width: 44px;
+      height: 36px;
       border: 2px solid #3a3a3a;
-      border-radius: 5px;
+      border-radius: 5px 5px 0 0;
       padding: 2px;
       background: none;
       cursor: pointer;
       transition: border-color 0.15s;
+      display: block;
     }
 
     .swatch-group input[type="color"]:hover {
       border-color: #666;
+    }
+
+    .hex-input {
+      width: 44px;
+      background: #1e1e1e;
+      border: 2px solid #3a3a3a;
+      border-top: none;
+      border-radius: 0 0 5px 5px;
+      color: #ccc;
+      font-size: 9px;
+      font-family: monospace;
+      text-align: center;
+      padding: 2px 0;
+      outline: none;
+      cursor: text;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .hex-input:focus {
+      border-color: #666;
+      color: #fff;
+    }
+
+    .hex-input.invalid {
+      color: #f87171;
+      border-color: #7f1d1d;
     }
 
     #copy-btn {
@@ -156,7 +183,11 @@
         if (val && /^[0-9a-fA-F]{6}$/.test(val)) {
           applyColor(hex, val);
           const input = document.getElementById('input-' + i);
-          if (input) input.value = '#' + val.toLowerCase();
+          if (input) {
+            input.value = '#' + val.toLowerCase();
+            const hexSibling = input.nextElementSibling;
+            if (hexSibling) hexSibling.value = input.value;
+          }
         }
       });
     }
@@ -178,13 +209,48 @@
         inp.type = 'color';
         inp.id = 'input-' + i;
         inp.value = '#' + currentColors[hex].toLowerCase();
+
+        const hexInp = document.createElement('input');
+        hexInp.type = 'text';
+        hexInp.className = 'hex-input';
+        hexInp.maxLength = 7;
+        hexInp.value = inp.value;
+        hexInp.spellcheck = false;
+
         inp.addEventListener('input', () => {
-          applyColor(hex, inp.value.replace('#', ''));
+          const val = inp.value.replace('#', '');
+          applyColor(hex, val);
+          hexInp.value = inp.value;
+          hexInp.classList.remove('invalid');
           history.replaceState(null, '', buildURL());
+        });
+
+        hexInp.addEventListener('input', () => {
+          let raw = hexInp.value.replace(/[^0-9a-fA-F#]/g, '');
+          if (!raw.startsWith('#')) raw = '#' + raw.replace('#', '');
+          hexInp.value = raw;
+          const stripped = raw.replace('#', '');
+          if (/^[0-9a-fA-F]{6}$/.test(stripped)) {
+            hexInp.classList.remove('invalid');
+            inp.value = '#' + stripped.toLowerCase();
+            applyColor(hex, stripped);
+            history.replaceState(null, '', buildURL());
+          } else {
+            hexInp.classList.add('invalid');
+          }
+        });
+
+        hexInp.addEventListener('blur', () => {
+          // Reset to current valid color if input is left invalid
+          if (hexInp.classList.contains('invalid')) {
+            hexInp.value = '#' + currentColors[hex].toLowerCase();
+            hexInp.classList.remove('invalid');
+          }
         });
 
         group.appendChild(lbl);
         group.appendChild(inp);
+        group.appendChild(hexInp);
         toolbar.appendChild(group);
       });
 
