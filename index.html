@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HouseColor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      background: #1a1a1a;
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #fff;
+    }
+
+    #svg-container {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 12px 12px 0;
+    }
+
+    #svg-container svg {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+    }
+
+    #loading {
+      color: #888;
+      font-size: 14px;
+    }
+
+    #toolbar {
+      flex: 0 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 8px 16px;
+      padding: 10px 16px;
+      background: #111;
+      border-top: 1px solid #2a2a2a;
+    }
+
+    .swatch-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .swatch-group label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      user-select: none;
+    }
+
+    .swatch-group input[type="color"] {
+      width: 40px;
+      height: 30px;
+      border: 2px solid #3a3a3a;
+      border-radius: 5px;
+      padding: 2px;
+      background: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .swatch-group input[type="color"]:hover {
+      border-color: #666;
+    }
+
+    #copy-btn {
+      padding: 8px 14px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background 0.15s;
+      align-self: flex-end;
+      margin-bottom: 2px;
+    }
+
+    #copy-btn:hover { background: #1d4ed8; }
+    #copy-btn.copied { background: #16a34a; }
+  </style>
+</head>
+<body>
+  <div id="svg-container">
+    <p id="loading">Loading…</p>
+  </div>
+  <div id="toolbar"></div>
+
+  <script>
+    const PARAM_MAP = [
+      { param: 'c1', hex: '2D2D2D', label: 'Walls' },
+      { param: 'c2', hex: '4A4141', label: 'Trim' },
+      { param: 'c3', hex: '88A6D0', label: 'Windows' },
+      { param: 'c4', hex: 'E3D5C7', label: 'Casings' },
+      { param: 'c5', hex: 'D9D9D9', label: 'Gutters' },
+      { param: 'c6', hex: 'EADDD1', label: 'Facade' },
+      { param: 'c7', hex: '835822', label: 'Roof' },
+    ];
+
+    // currentColors maps hex key → current 6-char uppercase hex
+    const currentColors = {};
+    PARAM_MAP.forEach(({ hex }) => { currentColors[hex] = hex; });
+
+    // groups maps hex key → array of SVG elements
+    const groups = {};
+    PARAM_MAP.forEach(({ hex }) => { groups[hex] = []; });
+
+    function normHex(fill) {
+      if (!fill) return null;
+      const f = fill.trim();
+      if (f === 'none' || f === 'white' || f.startsWith('url(')) return null;
+      return f.replace('#', '').toUpperCase();
+    }
+
+    function applyColor(hexKey, newHex) {
+      // newHex is a 6-char string (no #), may be lowercase from input
+      const normalized = newHex.toUpperCase();
+      currentColors[hexKey] = normalized;
+      groups[hexKey].forEach(el => el.setAttribute('fill', '#' + normalized));
+    }
+
+    function buildURL() {
+      const params = new URLSearchParams();
+      PARAM_MAP.forEach(({ param, hex }) => {
+        params.set(param, currentColors[hex].toLowerCase());
+      });
+      return location.origin + location.pathname + '?' + params.toString();
+    }
+
+    function readURLParams() {
+      const params = new URLSearchParams(location.search);
+      PARAM_MAP.forEach(({ param, hex }, i) => {
+        const val = params.get(param);
+        if (val && /^[0-9a-fA-F]{6}$/.test(val)) {
+          applyColor(hex, val);
+          const input = document.getElementById('input-' + i);
+          if (input) input.value = '#' + val.toLowerCase();
+        }
+      });
+    }
+
+    function buildToolbar() {
+      const toolbar = document.getElementById('toolbar');
+      toolbar.innerHTML = '';
+
+      PARAM_MAP.forEach(({ hex, label }, i) => {
+        const group = document.createElement('div');
+        group.className = 'swatch-group';
+
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        lbl.htmlFor = 'input-' + i;
+
+        const inp = document.createElement('input');
+        inp.type = 'color';
+        inp.id = 'input-' + i;
+        inp.value = '#' + currentColors[hex].toLowerCase();
+        inp.addEventListener('input', () => {
+          applyColor(hex, inp.value.replace('#', ''));
+          history.replaceState(null, '', buildURL());
+        });
+
+        group.appendChild(lbl);
+        group.appendChild(inp);
+        toolbar.appendChild(group);
+      });
+
+      const btn = document.createElement('button');
+      btn.id = 'copy-btn';
+      btn.textContent = 'Copy Link';
+      btn.addEventListener('click', () => {
+        navigator.clipboard.writeText(buildURL()).then(() => {
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => {
+            btn.textContent = 'Copy Link';
+            btn.classList.remove('copied');
+          }, 1800);
+        });
+      });
+      toolbar.appendChild(btn);
+    }
+
+    fetch('Asset.svg')
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to load Asset.svg');
+        return r.text();
+      })
+      .then(svgText => {
+        const container = document.getElementById('svg-container');
+        container.innerHTML = svgText;
+
+        const svg = container.querySelector('svg');
+        if (svg) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+
+        // Scan and group elements
+        container.querySelectorAll('path, rect').forEach(el => {
+          const key = normHex(el.getAttribute('fill'));
+          if (key && groups[key]) {
+            groups[key].push(el);
+            el.style.mixBlendMode = 'multiply';
+          }
+        });
+
+        buildToolbar();
+        readURLParams();
+      })
+      .catch(err => {
+        document.getElementById('loading').textContent = 'Error: ' + err.message;
+      });
+  </script>
+</body>
+</html>
