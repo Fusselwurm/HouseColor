@@ -113,6 +113,7 @@
 </head>
 <body>
   <div id="svg-container">
+    <object id="svg-object" type="image/svg+xml" data="Asset.svg"></object>
     <p id="loading">Loading…</p>
   </div>
   <div id="toolbar"></div>
@@ -231,47 +232,38 @@
       });
     }
 
-    fetch('Asset.svg')
-      .then(r => {
-        if (!r.ok) throw new Error('Failed to load Asset.svg');
-        return r.text();
-      })
-      .then(svgText => {
-        const container = document.getElementById('svg-container');
-        container.innerHTML = svgText;
+    const obj = document.getElementById("svg-object");
+    obj.addEventListener("load", () => {
+      const svgDoc = obj.contentDocument;
+      const svgEl = svgDoc.querySelector('svg');
+      if (svgEl) {
+        svgEl.removeAttribute('width');
+        svgEl.removeAttribute('height');
+        // Remove the white backdrop rect so colored shapes multiply against the photo
+        const firstRect = svgEl.querySelector('rect[fill="white"]');
+        if (firstRect) firstRect.remove();
+      }
 
-        const svgEl = container.querySelector('svg');
-        if (svgEl) {
-          svgEl.removeAttribute('width');
-          svgEl.removeAttribute('height');
-          // Remove the white backdrop rect so colored shapes multiply against the photo
-          const firstRect = svgEl.querySelector('rect[fill="white"]');
-          if (firstRect) firstRect.remove();
+      // Wrap all colored shapes in a <g> with mix-blend-mode: multiply
+      const coloredEls = [];
+      svgEl.querySelectorAll('path, rect').forEach(el => {
+        const key = normHex(el.getAttribute('fill'));
+        if (key && groups[key]) {
+          groups[key].push(el);
+          coloredEls.push(el);
         }
-
-        // Wrap all colored shapes in a <g> with mix-blend-mode: multiply
-        const coloredEls = [];
-        container.querySelectorAll('path, rect').forEach(el => {
-          const key = normHex(el.getAttribute('fill'));
-          if (key && groups[key]) {
-            groups[key].push(el);
-            coloredEls.push(el);
-          }
-        });
-
-        if (coloredEls.length && svgEl) {
-          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-          g.style.mixBlendMode = 'multiply';
-          coloredEls[0].parentNode.insertBefore(g, coloredEls[0]);
-          coloredEls.forEach(el => g.appendChild(el));
-        }
-
-        buildToolbar();
-        readURLParams();
-      })
-      .catch(err => {
-        document.getElementById('loading').textContent = 'Error: ' + err.message;
       });
+
+      if (coloredEls.length && svgEl) {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.style.mixBlendMode = 'multiply';
+        coloredEls[0].parentNode.insertBefore(g, coloredEls[0]);
+        coloredEls.forEach(el => g.appendChild(el));
+      }
+
+      buildToolbar();
+      readURLParams();
+    });
   </script>
 </body>
 </html>
